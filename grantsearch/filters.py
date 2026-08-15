@@ -217,7 +217,7 @@ def _in_window(value: str | None, after: str | None, before: str | None) -> bool
     return True
 
 
-# Convenience filters for the themes in idea.md.
+# Convenience filters for the common private-markets questions.
 STARTUPS_ONLY = RecordFilter(recipient_types={"company"}, programs={"SBIR", "STTR"})
 POTENTIAL_SPINOUTS = RecordFilter(programs={"STTR"}, require_ri=True)
 RETRIEVABLE = RecordFilter(require_abstract=True, min_abstract_chars=100)

@@ -137,8 +137,8 @@ record.agency_label  # "Health and Human Services - National Institutes of Healt
 
 ## Schema
 
-`Record` (`grantsearch/models.py`) carries the fields from `idea.md` plus a
-few later stages need:
+`Record` (`grantsearch/models.py`) is the common schema every source
+normalizes into:
 
 - `abstract` is the source text; **`abstract_clean`** is the search-facing
   version (HTML stripped, `"DESCRIPTION (provided by applicant):"`-style
