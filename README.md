@@ -33,6 +33,15 @@ Or from source:
 pip install git+https://github.com/AnirudhJM24/SBIR-grant-search.git
 ```
 
+## Demo
+
+```bash
+python examples/demo.py 2023
+```
+
+A tour of the whole library against real data: fallback, composed filters,
+agency naming, the spinout signal, company grouping and exports.
+
 ## Downloading
 
 `download()` takes filters as keyword arguments and returns a `Download`:

@@ -4,6 +4,7 @@
 data/
 *.jsonl
 award_data*.csv
+demo_*.csv
 
 # Python
 __pycache__/
