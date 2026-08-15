@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grantsearch"
+version = "0.1.0"
+description = "Download US government innovation-funding records into one common schema, filtered how you ask."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["sbir", "sttr", "grants", "government", "innovation", "search"]
+dependencies = []  # stdlib only
+
+[project.optional-dependencies]
+pandas = ["pandas>=2.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+grantsearch = "grantsearch.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["grantsearch*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,32 @@
+# Downloaded and generated data. The bulk SBIR.gov export is ~350 MB, well
+# past GitHub's 100 MB file limit, and it is reproducible: the library
+# re-downloads it into data/cache/ on demand.
+data/
+*.jsonl
+award_data*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
