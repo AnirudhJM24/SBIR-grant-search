@@ -136,9 +136,18 @@ gs.download(..., transport="csv")      # pin the bulk file
 gs.download(..., transport="api")      # pin the API; raises if it's down
 ```
 
+Fallback happens twice over: once when picking a transport, and again if the
+chosen one fails **during** a download. A probe only proves the endpoint
+answers, not that a large request will succeed, so a transport that dies
+mid-fetch is abandoned and the next one retries that year. Rows are
+materialized before any are emitted, so a half-finished download never
+leaks partial results.
+
 Pin a transport when you need determinism — `auto` is for convenience, and a
 pipeline that must be reproducible should fail loudly rather than silently
-switch.
+switch. A pinned transport never falls back, and only "this endpoint is
+down" errors trigger a fallback at all: a `TypeError` from a bad filter
+surfaces rather than being masked by quietly changing source.
 
 **Two things to know about `search`.** It is an undocumented form endpoint,
 not a public API, so it can change without notice — which is why the bulk CSV
@@ -287,7 +296,7 @@ reapplies the filter regardless, so ignoring the hint is always correct.
 ## Tests
 
 ```bash
-python -m pytest tests -q    # 226 tests, no network required
+python -m pytest tests -q    # 233 tests, no network required
 ```
 
 Parser tests encode the actual junk in federal exports (`"171,433"`,

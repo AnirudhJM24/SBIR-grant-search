@@ -24,6 +24,7 @@ from typing import Literal
 from ..filters import RecordFilter
 from ..models import Record
 from .base import SourceAdapter
+from .http import HttpError
 from .sbir_api import SbirApiAdapter, SbirApiUnavailable
 from .sbir_csv import SbirCsvAdapter
 from .sbir_search import SbirSearchAdapter, SbirSearchUnavailable
@@ -31,6 +32,16 @@ from .sbir_search import SbirSearchAdapter, SbirSearchUnavailable
 log = logging.getLogger(__name__)
 
 Transport = Literal["auto", "api", "search", "csv"]
+
+#: Failures that mean "this transport is not working right now" rather than
+#: "the caller made a mistake". Only these trigger a fallback; a TypeError
+#: or a bad filter must surface, not be masked by silently switching source.
+RECOVERABLE_ERRORS = (
+    SbirApiUnavailable,
+    SbirSearchUnavailable,
+    HttpError,
+    OSError,
+)
 
 
 class SbirSource(SourceAdapter):
@@ -129,7 +140,7 @@ class SbirSource(SourceAdapter):
         ):
             try:
                 adapter.prepare()
-            except (SbirApiUnavailable, SbirSearchUnavailable, OSError) as exc:
+            except RECOVERABLE_ERRORS as exc:
                 log.info(
                     "%s unavailable (%s); trying the next transport.",
                     adapter.name, exc.__class__.__name__,
@@ -154,7 +165,66 @@ class SbirSource(SourceAdapter):
     def fetch_year(
         self, year: int, record_filter: RecordFilter | None = None
     ) -> Iterator[dict]:
-        return self.active.fetch_year(year, record_filter)
+        """Yield raw rows for ``year``, moving down the chain on failure.
+
+        Selecting a transport is not the same as it working: a probe only
+        proves the endpoint answers, not that a large download will
+        succeed. In ``auto`` mode a transport that fails mid-fetch is
+        abandoned and the next one retries the same year.
+
+        A pinned transport raises instead. A pipeline that asked for one
+        specific source should fail loudly rather than quietly return data
+        from somewhere else -- the bulk file has no UEI, so a silent
+        downgrade would change the shape of the result.
+        """
+        adapter = self.active
+        if self.transport != "auto":
+            yield from adapter.fetch_year(year, record_filter)
+            return
+
+        remaining = self._chain_from(adapter)
+        for index, candidate in enumerate(remaining):
+            is_last = index == len(remaining) - 1
+            try:
+                if is_last:
+                    # Nothing left to fall back to, so stream rather than
+                    # buffer -- the bulk file is far too large to hold.
+                    self._activate(candidate)
+                    yield from candidate.fetch_year(year, record_filter)
+                    return
+
+                # Materialize before yielding anything. A transport that
+                # dies halfway through would otherwise have already emitted
+                # rows, and the retry would duplicate them.
+                candidate.prepare()
+                rows = list(candidate.fetch_year(year, record_filter))
+            except RECOVERABLE_ERRORS as exc:
+                log.warning(
+                    "%s failed on FY%d (%s: %s); falling back to the next "
+                    "transport.", candidate.name, year,
+                    exc.__class__.__name__, exc,
+                )
+                continue
+
+            self._activate(candidate)
+            yield from rows
+            return
+
+    def _chain_from(self, adapter: SourceAdapter) -> list[SourceAdapter]:
+        """The selected transport, then everything cheaper-to-worse after it."""
+        order = [self._api, self._search, self._csv]
+        start = order.index(adapter) if adapter in order else 0
+        return order[start:]
+
+    def _activate(self, adapter: SourceAdapter) -> None:
+        """Record which transport is serving, so normalize() matches it.
+
+        Each adapter has its own column mapping, so a row must be
+        normalized by whichever one produced it.
+        """
+        if self._active is not adapter:
+            log.info("switched transport to %s.", adapter.name)
+        self._active = adapter
 
     def normalize(self, raw: dict) -> Record | None:
         return self.active.normalize(raw)

@@ -427,3 +427,145 @@ def test_describe_lists_every_active_constraint():
     for expected in ("agency=NASA", "state=CA", "program=STTR",
                      "amount>=500000", "contains=laser", "require_ri"):
         assert expected in text
+
+
+# -- runtime transport failover -------------------------------------------
+
+
+def _boom(*args, **kwargs):
+    from sbirgrantsearch.ingest.http import HttpError
+
+    raise HttpError("502 from the endpoint")
+    yield  # pragma: no cover - makes this a generator function
+
+
+def test_failover_when_a_transport_dies_mid_fetch(local_csv, monkeypatch):
+    """Passing a probe is not the same as the download working."""
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year", _boom
+    )
+
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    source.prepare()
+    assert source.transport_used == "search"      # chosen by the probe
+
+    rows = list(source.fetch_year(2024))
+    assert len(rows) == 1
+    assert source.transport_used == "csv"         # ...but served by the CSV
+
+
+def test_failover_switches_the_normalizer_too(local_csv, monkeypatch):
+    """Each transport has its own column map; rows must match the one used."""
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year", _boom
+    )
+
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    rows = list(source.fetch_year(2024))
+    record = source.normalize(rows[0])
+    assert record is not None
+    assert record.recipient == "AGILE DATA DECISIONS, INC."
+
+
+def test_failover_emits_nothing_from_the_failed_transport(local_csv, monkeypatch):
+    """A transport that dies partway must not leave half a year behind."""
+    from sbirgrantsearch.ingest.http import HttpError
+
+    def half_then_die(self, year, record_filter=None):
+        yield {"Company Name": "PARTIAL", "Award Year": "2024"}
+        raise HttpError("died after one row")
+
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year",
+        half_then_die,
+    )
+
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    rows = list(source.fetch_year(2024))
+    assert not any(r.get("Company Name") == "PARTIAL" for r in rows)
+    assert len(rows) == 1
+
+
+def test_pinned_transport_does_not_fail_over(local_csv, monkeypatch):
+    """Determinism beats availability when a caller named a transport."""
+    from sbirgrantsearch.ingest.http import HttpError
+
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year", _boom
+    )
+    source = SbirSource(transport="search", csv_path=local_csv)
+    with pytest.raises(HttpError):
+        list(source.fetch_year(2024))
+
+
+def test_programming_errors_are_not_masked_by_failover(local_csv, monkeypatch):
+    """Only 'this endpoint is down' falls back, never a bug in the caller."""
+    def type_error(self, year, record_filter=None):
+        raise TypeError("bad filter")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year", type_error
+    )
+
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    with pytest.raises(TypeError):
+        list(source.fetch_year(2024))
+
+
+def test_chain_order_is_api_then_search_then_csv(local_csv):
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    names = [a.name for a in source._chain_from(source._api)]
+    assert names == ["sbir_api", "sbir_search", "sbir_csv"]
+    assert [a.name for a in source._chain_from(source._search)] == [
+        "sbir_search", "sbir_csv",
+    ]
+    assert [a.name for a in source._chain_from(source._csv)] == ["sbir_csv"]
+
+
+def test_download_survives_a_failing_transport(local_csv, monkeypatch):
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.fetch_year", _boom
+    )
+    result = gs.download(csv_path=local_csv, years=[2024])
+    assert len(result) == 1
+    assert result.transport == "csv"

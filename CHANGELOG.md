@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0
+
+### Added
+
+- **Transport failover now covers the whole fetch, not just the choice of
+  transport.** Selection already tried `api → search → csv`, but that
+  decision was made from a probe and never revisited: a transport that
+  passed its probe and then failed partway through a download raised
+  instead of falling back. It now moves down the chain and retries the
+  year, and `normalize()` follows the switch so rows are read with the
+  column map of whichever transport produced them.
+- Rows are materialized before any are emitted, so a transport that dies
+  halfway through never leaves partial results behind for the next one to
+  duplicate. The last transport in the chain streams instead, since the
+  bulk file is too large to hold.
+
+### Notes
+
+- A pinned transport still raises rather than falling back — a pipeline
+  that named a source should fail loudly, not quietly return data of a
+  different shape (the bulk file has no UEI).
+- Only "this endpoint is down" errors trigger a fallback. A `TypeError`
+  from a bad filter surfaces instead of being masked.
+
 ## 0.1.1
 
 ### Changed
