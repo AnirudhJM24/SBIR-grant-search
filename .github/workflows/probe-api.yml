@@ -1,0 +1,66 @@
+name: Probe SBIR.gov API
+
+# The SBIR.gov JSON API has been under maintenance with no published ETA.
+# This checks weekly and opens an issue the day it answers, so the switch
+# from the bulk-CSV fallback does not depend on anyone remembering to look.
+
+on:
+  schedule:
+    # Mondays at 13:17 UTC. Off the hour on purpose: GitHub queues the
+    # cron spike at :00 and scheduled runs can be delayed or dropped.
+    - cron: "17 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: python -m pip install --quiet -e .
+
+      - name: Probe
+        id: probe
+        # Exits 0 when the API serves data, 1 while it is down. A down API
+        # is the expected state, so it must not fail the workflow.
+        continue-on-error: true
+        run: python -m sbirgrantsearch.cli probe-api
+
+      - name: Report still down
+        if: steps.probe.outcome == 'failure'
+        run: echo "::notice::SBIR.gov API is still under maintenance."
+
+      - name: Open an issue if the API is back
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Create the label first: `gh issue list --label` errors on a
+          # label that does not exist, and set -e would abort the step.
+          gh label create api-status \
+            --description "SBIR.gov API availability" \
+            --color 0E8A16 2>/dev/null || true
+
+          # Only one open issue at a time, or a year of Mondays would each
+          # file their own.
+          existing=$(gh issue list --state open --label api-status \
+            --json number --jq 'length')
+          if [ "$existing" != "0" ]; then
+            echo "An open api-status issue already exists; nothing to do."
+            exit 0
+          fi
+
+          gh issue create \
+            --label api-status \
+            --title "SBIR.gov JSON API is responding again" \
+            --body-file .github/api-back-issue.md
