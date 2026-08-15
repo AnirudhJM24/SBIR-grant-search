@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Work happens on feature/ and fix/ branches, so they are tested on
+    # every push -- not only once a PR exists.
+    branches: [main, "feature/**", "fix/**"]
   pull_request:
   workflow_dispatch:
 
@@ -10,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  branch-name:
+    name: Branch naming
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require feature/ or fix/
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$BRANCH" in
+            feature/*|fix/*)
+              echo "::notice::$BRANCH follows the convention." ;;
+            *)
+              echo "::error::Branch '$BRANCH' must be named feature/<name> or fix/<name>."
+              exit 1 ;;
+          esac
+
   test:
     name: py${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

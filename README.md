@@ -264,6 +264,12 @@ sbirgrantsearch probe-api
 
 Same filters as the library, as `--flags`.
 
+## Contributing
+
+Work happens on `feature/<name>` and `fix/<name>` branches and merges to
+`main`; a merge to `main` publishes to PyPI when the version changes. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Adding a source
 
 Subclass `SourceAdapter` (`sbirgrantsearch/ingest/base.py`) with `fetch_year`
