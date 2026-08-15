@@ -12,9 +12,11 @@ and it moves agency, year, state, phase and program filtering server-side.
 Two caveats shape the implementation:
 
 * Results are capped near 10,000 rows. Past that the endpoint answers with
-  a redirect to the HTML page instead of an error, so a cap hit looks like
-  success unless you check the content type. :meth:`fetch_year` detects it
-  and re-runs the year agency by agency.
+  a redirect to the HTML page instead of an error -- and it answers an
+  *empty* query exactly the same way, with no distinguishing message. A
+  non-CSV response is therefore ambiguous, and :meth:`_fetch` resolves it
+  by halving the agency set: a truly oversized slice yields CSV once split,
+  an empty one stays empty.
 * This is an undocumented form endpoint, not a public API. It can change
   without notice, which is why the bulk CSV remains the guaranteed floor.
 
@@ -33,7 +35,7 @@ import urllib.request
 from collections.abc import Iterator, Sequence
 from http.cookiejar import CookieJar
 
-from ..clean import normalize_agency, normalize_branch
+from ..clean import normalize_branch
 from ..filters import RecordFilter
 from ..models import Record
 from .base import SourceAdapter
@@ -143,7 +145,7 @@ class SbirSearchAdapter(SourceAdapter):
         timeout: int = 300,
         delay: float = 1.0,
         min_abstract_chars: int = 100,
-        max_shards: int = 60,
+        max_split_depth: int = 3,
     ) -> None:
         """
         Args:
@@ -151,13 +153,15 @@ class SbirSearchAdapter(SourceAdapter):
             timeout: seconds to allow per download (large years are slow).
             delay: seconds between requests, to stay polite.
             min_abstract_chars: rows with shorter abstracts are dropped.
-            max_shards: safety stop on agency sharding.
+            max_split_depth: how many times a query may be halved. A real
+                cap resolves at the first split, so this mainly bounds the
+                cost of confirming an empty slice (2**depth requests).
         """
         self.url = url
         self.timeout = timeout
         self.delay = delay
         self.min_abstract_chars = min_abstract_chars
-        self.max_shards = max_shards
+        self.max_split_depth = max_split_depth
         self._opener: urllib.request.OpenerDirector | None = None
         _raise_csv_field_limit()
 
@@ -183,36 +187,71 @@ class SbirSearchAdapter(SourceAdapter):
     def fetch_year(
         self, year: int, record_filter: RecordFilter | None = None
     ) -> Iterator[dict]:
-        """Yield rows for ``year``, sharding by agency if the cap is hit."""
-        agencies = self._form_agencies(record_filter)
+        """Yield rows for ``year``, splitting the query if it is too large.
 
+        The endpoint answers a too-large query and an empty one identically
+        -- a 303 back to the HTML page, with no distinguishing message --
+        so the two are told apart structurally rather than from the
+        response. See :meth:`_fetch` for how.
+        """
+        agencies = self._form_agencies(record_filter)
+        yield from self._fetch(year, agencies, record_filter, depth=0)
+
+    def _fetch(
+        self,
+        year: int,
+        agencies: Sequence[str],
+        record_filter: RecordFilter | None,
+        *,
+        depth: int,
+    ) -> Iterator[dict]:
+        """Fetch one slice, halving the agency set when the answer is unclear.
+
+        A non-CSV response means either "no results" or "too many results".
+        Splitting distinguishes them: if the slice was genuinely too large,
+        the halves come back as CSV; if it was empty, the halves are empty
+        too and the recursion bottoms out.
+
+        The base case is safe because a single agency-year is far below the
+        cap -- the largest in the corpus is DoD 2020 at 3,852 rows against
+        a 10,000 limit -- so a single-agency slice that does not return CSV
+        is empty, not truncated.
+        """
         rows = self._download(year, agencies, record_filter)
         if rows is not None:
             yield from rows
             return
 
-        # Cap hit. Split the request across agencies; the widest single
-        # agency-year is far below the cap, so one level of sharding is
-        # enough in practice.
-        shards = agencies or list(FORM_AGENCIES)
-        log.info(
-            "%s: FY%d exceeded the %d-row cap, sharding across %d agencies",
-            self.name, year, RESULT_CAP, len(shards),
-        )
-        if len(shards) > self.max_shards:
-            raise SbirSearchUnavailable(
-                f"FY{year} needs {len(shards)} shards, over max_shards="
-                f"{self.max_shards}. Narrow the filter or use the bulk CSV."
+        candidates = list(agencies) if agencies else list(FORM_AGENCIES)
+        if len(candidates) <= 1:
+            log.debug(
+                "FY%d agencies=%s returned no CSV at the narrowest slice; "
+                "treating as empty", year, candidates or "all",
             )
+            return
 
-        for agency in shards:
-            shard_rows = self._download(year, [agency], record_filter)
-            if shard_rows is None:
-                raise SbirSearchUnavailable(
-                    f"FY{year} agency={agency} still exceeds the row cap; "
-                    f"this transport cannot serve that slice."
-                )
-            yield from shard_rows
+        if depth >= self.max_split_depth:
+            # Exhausted the split budget without ever seeing CSV. Every
+            # realistic over-cap slice resolves at the first split -- the
+            # largest whole year in the corpus is 7,634 rows against a
+            # 10,000 cap -- so reaching here means the slice is empty, not
+            # oversized. Warn rather than raise: refusing to return an
+            # empty result would break ordinary queries for quiet years.
+            log.warning(
+                "FY%d: %d agencies never returned CSV within "
+                "max_split_depth=%d; treating the slice as empty. If this "
+                "year should have awards, cross-check with transport='csv'.",
+                year, len(candidates), self.max_split_depth,
+            )
+            return
+
+        mid = len(candidates) // 2
+        log.debug(
+            "FY%d: splitting %d agencies into %d + %d",
+            year, len(candidates), mid, len(candidates) - mid,
+        )
+        for half in (candidates[:mid], candidates[mid:]):
+            yield from self._fetch(year, half, record_filter, depth=depth + 1)
 
     def normalize(self, raw: dict) -> Record | None:
         fields = {target: raw.get(column) for column, target in COLUMN_MAP.items()}

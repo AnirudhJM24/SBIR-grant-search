@@ -178,29 +178,62 @@ def test_fetch_year_parses_csv(adapter, monkeypatch):
     assert rows[0]["Company Name"] == "INNOSENSE CORPORATION"
 
 
-def test_non_csv_response_is_treated_as_a_cap_hit(adapter, monkeypatch):
-    """Over the cap the endpoint returns HTML, not an error."""
-    assert adapter._download(2023, ["NASA"], None) is None if False else True
+def test_non_csv_response_signals_ambiguity(adapter, monkeypatch):
+    """Over the cap -- and when empty -- the endpoint returns HTML."""
     drive(adapter, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
     assert adapter._download(2023, ["NASA"], None) is None
 
 
-def test_cap_hit_shards_by_agency(adapter, monkeypatch):
-    """An unfiltered year over the cap is re-run agency by agency."""
+def test_empty_slice_returns_nothing_rather_than_raising(adapter, monkeypatch):
+    """A slice with no awards answers exactly like an over-cap one.
+
+    Splitting bottoms out at a single agency, which cannot be over the cap
+    (the largest agency-year in the corpus is ~3,850 against a 10,000
+    limit), so the empty reading is the correct one.
+    """
+    drive(adapter, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
+    assert list(adapter.fetch_year(1990, RecordFilter(branches={"ARPA-H"}))) == []
+
+
+def test_empty_broad_year_costs_a_bounded_number_of_requests(
+    adapter, monkeypatch
+):
+    """Confirming emptiness must not fan out to one request per agency."""
+    calls = drive(adapter, monkeypatch,
+                  lambda f: FakeResponse("<html>", "text/html"))
+    assert list(adapter.fetch_year(1970)) == []
+    # A full binary tree of depth d is 2**(d+1)-1 nodes.
+    assert len(calls) <= 2 ** (adapter.max_split_depth + 1) - 1
+    assert len(calls) < len(FORM_AGENCIES)
+
+
+def test_exhausted_split_budget_warns_instead_of_raising(adapter, monkeypatch, caplog):
+    drive(adapter, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
+    with caplog.at_level("WARNING"):
+        assert list(adapter.fetch_year(1970)) == []
+    assert "treating the slice as empty" in caplog.text
+
+
+def test_oversized_year_is_split_until_it_fits(adapter, monkeypatch):
+    """A genuinely capped slice yields CSV once halved enough.
+
+    The fake serves one row per agency, so a correct split covers every
+    agency exactly once -- no gaps, no double-counting.
+    """
     def responder(fields):
         agencies = [k for k in fields if k.startswith("agency[")]
-        if not agencies:  # the initial unfiltered attempt
+        # No agency boxes means *all* agencies -- the largest query, not
+        # the smallest.
+        if not agencies or len(agencies) > 6:
             return FakeResponse("<html>redirect</html>", "text/html")
-        return FakeResponse(make_csv([row()]), "text/csv")
+        return FakeResponse(make_csv([row()] * len(agencies)), "text/csv")
 
-    calls = drive(adapter, monkeypatch, responder)
+    drive(adapter, monkeypatch, responder)
     rows = list(adapter.fetch_year(2023))
-
-    assert len(rows) == len(FORM_AGENCIES)          # one row per shard
-    assert len(calls) == len(FORM_AGENCIES) + 1     # plus the failed attempt
+    assert len(rows) == len(FORM_AGENCIES)
 
 
-def test_cap_hit_shards_only_within_the_requested_agencies(adapter, monkeypatch):
+def test_split_stays_within_the_requested_agencies(adapter, monkeypatch):
     def responder(fields):
         agencies = [k for k in fields if k.startswith("agency[")]
         if len(agencies) > 1:
@@ -212,18 +245,12 @@ def test_cap_hit_shards_only_within_the_requested_agencies(adapter, monkeypatch)
     assert len(rows) == 2  # DOE and ARPA-E, not all 44 form values
 
 
-def test_shard_that_still_exceeds_the_cap_raises(adapter, monkeypatch):
-    drive(adapter, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
-    with pytest.raises(SbirSearchUnavailable, match="exceeds the row cap"):
-        list(adapter.fetch_year(2023, RecordFilter(agencies={"NASA"})))
-
-
-def test_too_many_shards_raises_rather_than_hammering(monkeypatch):
-    a = SbirSearchAdapter(delay=0, max_shards=3)
+def test_split_depth_is_configurable(monkeypatch):
+    a = SbirSearchAdapter(delay=0, max_split_depth=1)
     monkeypatch.setattr(a, "_fresh_build_id", lambda: "form-TEST")
-    drive(a, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
-    with pytest.raises(SbirSearchUnavailable, match="max_shards"):
-        list(a.fetch_year(2023))
+    calls = drive(a, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
+    assert list(a.fetch_year(2023)) == []
+    assert len(calls) == 3  # the full query, then two halves
 
 
 def test_warns_when_rows_reach_the_cap(adapter, monkeypatch, caplog):
