@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.1
+
+### Changed
+
+- An empty result now reports itself. `summary()` leads with "No awards
+  matched" and names the filters instead of printing zeros, and indexing
+  an empty result raises an `IndexError` that says which filters produced
+  no rows. Indexing still raises: an empty sequence has no element 0, and
+  returning `None` would hide a no-match until something downstream broke
+  oddly.
+- Added `.first` (the first record, or `None`), `.query`, and
+  `RecordFilter.describe()`. `TopicResults` gets the same treatment.
+
+### Internal
+
+- Releases now publish from the version in `pyproject.toml` rather than
+  from a manually pushed tag, and the workflow tags the commit and opens a
+  GitHub Release afterwards.
+
 ## 0.1.0
 
 ### Added
