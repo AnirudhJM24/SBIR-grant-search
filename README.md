@@ -212,3 +212,16 @@ python -m pytest tests -q    # 166 tests, no network required
 Parser tests encode the actual junk in federal exports (`"171,433"`,
 `"(500)"`, `"01/01/1900"`, double-escaped entities); fallback tests cover
 transport selection, pinning, and id equality across paths.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Disclaimer
+
+sbirgrantsearch is an independent open-source project and is not affiliated
+with, endorsed by, or maintained by the U.S. Small Business Administration or
+SBIR.gov. Award data is obtained from publicly available SBIR.gov APIs and
+bulk downloads and remains subject to the applicable terms and policies of
+the source. Users are responsible for complying with source-data
+requirements.
