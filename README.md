@@ -24,7 +24,13 @@ Stdlib only — no dependencies.
 ## Install
 
 ```bash
-pip install -e .
+pip install grantsearch
+```
+
+Or from source:
+
+```bash
+pip install git+https://github.com/AnirudhJM24/SBIR-grant-search.git
 ```
 
 ## Downloading
@@ -191,7 +197,7 @@ the filter regardless, so ignoring the hint is always correct.
 ## Tests
 
 ```bash
-python -m pytest tests -q    # 160 tests, no network required
+python -m pytest tests -q    # 166 tests, no network required
 ```
 
 Parser tests encode the actual junk in federal exports (`"171,433"`,

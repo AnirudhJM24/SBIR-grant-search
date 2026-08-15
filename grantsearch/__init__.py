@@ -18,7 +18,7 @@ from .filters import POTENTIAL_SPINOUTS, RETRIEVABLE, STARTUPS_ONLY, RecordFilte
 from .ingest import load_records
 from .models import Record
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
 
 __all__ = [
     "AGENCY_NAMES",
