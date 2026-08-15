@@ -4,7 +4,7 @@ One source, two ways in. :class:`SbirSource` prefers the JSON API (targeted
 requests, no big download) and falls back to the bulk CSV export when the
 API is unavailable -- which, as of 2026-08-15, it always is.
 
-Both transports produce byte-identical :class:`~grantsearch.models.Record`
+Both transports produce byte-identical :class:`~sbirgrantsearch.models.Record`
 objects, including ``record_id``, so which one served a given run is an
 operational detail rather than something callers have to handle.
 """

@@ -1,6 +1,6 @@
 """The library's front door.
 
-    import grantsearch as gs
+    import sbirgrantsearch as gs
 
     awards = gs.download(agency="NASA", state="CA", years=2023)
     print(len(awards), "via", awards.transport)
@@ -113,7 +113,7 @@ def normalize_years(years: Any) -> list[int]:
 class Download:
     """The result of a :func:`download` call.
 
-    Behaves like a sequence of :class:`~grantsearch.models.Record`, and
+    Behaves like a sequence of :class:`~sbirgrantsearch.models.Record`, and
     carries the provenance needed to know how the data arrived.
     """
 

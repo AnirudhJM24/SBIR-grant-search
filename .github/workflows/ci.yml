@@ -65,8 +65,8 @@ jobs:
         run: |
           python -m venv /tmp/clean
           /tmp/clean/bin/python -m pip install --quiet dist/*.whl
-          /tmp/clean/bin/python -c "import grantsearch; print(grantsearch.__version__)"
-          /tmp/clean/bin/grantsearch --help
+          /tmp/clean/bin/python -c "import sbirgrantsearch; print(sbirgrantsearch.__version__)"
+          /tmp/clean/bin/sbirgrantsearch --help
 
       - uses: actions/upload-artifact@v4
         with:

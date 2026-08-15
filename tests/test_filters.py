@@ -2,8 +2,8 @@
 
 import pytest
 
-from grantsearch.filters import RETRIEVABLE, STARTUPS_ONLY, RecordFilter, any_of
-from grantsearch.models import Record
+from sbirgrantsearch.filters import RETRIEVABLE, STARTUPS_ONLY, RecordFilter, any_of
+from sbirgrantsearch.models import Record
 
 
 def make(**overrides) -> Record:

@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "grantsearch"
+name = "sbirgrantsearch"
 version = "0.0.1"
 description = "Download US government innovation-funding records into one common schema, filtered how you ask."
 readme = "README.md"
@@ -47,13 +47,13 @@ Repository = "https://github.com/AnirudhJM24/SBIR-grant-search"
 Issues = "https://github.com/AnirudhJM24/SBIR-grant-search/issues"
 
 [project.scripts]
-grantsearch = "grantsearch.cli:main"
+sbirgrantsearch = "sbirgrantsearch.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["grantsearch*"]
+include = ["sbirgrantsearch*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-grantsearch = ["py.typed"]
+sbirgrantsearch = ["py.typed"]

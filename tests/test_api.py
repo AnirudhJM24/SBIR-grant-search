@@ -5,12 +5,12 @@ import json
 
 import pytest
 
-import grantsearch as gs
-from grantsearch.api import Download, make_filter, normalize_years
-from grantsearch.filters import RecordFilter
-from grantsearch.ingest.sbir import SbirSource
-from grantsearch.ingest.sbir_api import SbirApiUnavailable
-from grantsearch.models import Record
+import sbirgrantsearch as gs
+from sbirgrantsearch.api import Download, make_filter, normalize_years
+from sbirgrantsearch.filters import RecordFilter
+from sbirgrantsearch.ingest.sbir import SbirSource
+from sbirgrantsearch.ingest.sbir_api import SbirApiUnavailable
+from sbirgrantsearch.models import Record
 
 from .test_ingest import ROWS  # noqa: F401  (shared fixture data)
 
@@ -78,7 +78,7 @@ def test_normalize_years_defaults_and_rejects_empty():
 
 @pytest.fixture
 def local_csv(tmp_path):
-    from grantsearch.ingest.sbir_csv import COLUMN_MAP
+    from sbirgrantsearch.ingest.sbir_csv import COLUMN_MAP
 
     path = tmp_path / "award_data.csv"
     with path.open("w", encoding="utf-8", newline="") as fh:
@@ -91,7 +91,7 @@ def local_csv(tmp_path):
 
 def test_auto_falls_back_to_csv_when_api_is_down(local_csv, monkeypatch):
     monkeypatch.setattr(
-        "grantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
     )
     source = SbirSource(transport="auto", csv_path=local_csv)
     source.prepare()
@@ -100,7 +100,7 @@ def test_auto_falls_back_to_csv_when_api_is_down(local_csv, monkeypatch):
 
 def test_auto_prefers_api_when_it_is_up(local_csv, monkeypatch):
     monkeypatch.setattr(
-        "grantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: True
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: True
     )
     source = SbirSource(transport="auto", csv_path=local_csv)
     source.prepare()
@@ -110,7 +110,7 @@ def test_auto_prefers_api_when_it_is_up(local_csv, monkeypatch):
 def test_pinned_api_transport_raises_instead_of_falling_back(local_csv, monkeypatch):
     """A pinned transport must fail loudly -- pipelines need determinism."""
     monkeypatch.setattr(
-        "grantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
     )
     source = SbirSource(transport="api", csv_path=local_csv)
     with pytest.raises(SbirApiUnavailable):
@@ -121,7 +121,7 @@ def test_pinned_csv_transport_never_touches_the_api(local_csv, monkeypatch):
     def explode(self):
         raise AssertionError("API must not be probed when csv is pinned")
 
-    monkeypatch.setattr("grantsearch.ingest.sbir_api.SbirApiAdapter.probe", explode)
+    monkeypatch.setattr("sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", explode)
     source = SbirSource(transport="csv", csv_path=local_csv)
     source.prepare()
     assert source.transport_used == "csv"
@@ -134,8 +134,8 @@ def test_invalid_transport_rejected():
 
 def test_both_transports_share_one_logical_source(local_csv, monkeypatch):
     """The fallback is only transparent if record ids match across paths."""
-    from grantsearch.ingest.sbir_api import SbirApiAdapter
-    from grantsearch.ingest.sbir_csv import SbirCsvAdapter
+    from sbirgrantsearch.ingest.sbir_api import SbirApiAdapter
+    from sbirgrantsearch.ingest.sbir_csv import SbirCsvAdapter
 
     csv_adapter = SbirCsvAdapter(csv_path=local_csv)
     csv_adapter.prepare()
@@ -274,7 +274,7 @@ def test_summary_mentions_transport(result):
 
 def test_probe_result_is_cached_across_calls(monkeypatch):
     """Several download() calls must not each pay for a network probe."""
-    from grantsearch.ingest import sbir_api
+    from sbirgrantsearch.ingest import sbir_api
 
     sbir_api.reset_probe_cache()
     calls = []
@@ -292,7 +292,7 @@ def test_probe_result_is_cached_across_calls(monkeypatch):
 
 
 def test_probe_force_bypasses_cache(monkeypatch):
-    from grantsearch.ingest import sbir_api
+    from sbirgrantsearch.ingest import sbir_api
 
     sbir_api.reset_probe_cache()
     calls = []
@@ -309,7 +309,7 @@ def test_probe_force_bypasses_cache(monkeypatch):
 
 
 def test_probe_cache_expires(monkeypatch):
-    from grantsearch.ingest import sbir_api
+    from sbirgrantsearch.ingest import sbir_api
 
     sbir_api.reset_probe_cache()
     monkeypatch.setattr(sbir_api, "PROBE_TTL", 0.0)
@@ -328,7 +328,7 @@ def test_probe_cache_expires(monkeypatch):
 
 def test_probe_survives_maintenance_envelope(monkeypatch):
     """A {"message": "Forbidden"} body must return False, not propagate."""
-    from grantsearch.ingest import sbir_api
+    from sbirgrantsearch.ingest import sbir_api
 
     sbir_api.reset_probe_cache()
     monkeypatch.setattr(

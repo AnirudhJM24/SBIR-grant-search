@@ -1,8 +1,8 @@
 """Command-line entry point.
 
-    python -m grantsearch.cli ingest --years 2015-2025 --agency NASA --state CA
-    python -m grantsearch.cli profile data/raw
-    python -m grantsearch.cli probe-api
+    python -m sbirgrantsearch.cli ingest --years 2015-2025 --agency NASA --state CA
+    python -m sbirgrantsearch.cli profile data/raw
+    python -m sbirgrantsearch.cli probe-api
 """
 
 from __future__ import annotations
@@ -210,7 +210,7 @@ def cmd_probe_api(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="grantsearch",
+        prog="sbirgrantsearch",
         description="Ingest US government innovation funding records.",
     )
     parser.add_argument("-v", "--verbose", action="store_true")

@@ -3,7 +3,7 @@
 A Python library for downloading US government innovation-funding records
 into one common schema, filtered the way you ask for them.
 
-    import grantsearch as gs
+    import sbirgrantsearch as gs
 
     awards = gs.download(agency="NASA", state="CA", years=2023)
     print(awards.summary())

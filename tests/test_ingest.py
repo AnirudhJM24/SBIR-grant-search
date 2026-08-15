@@ -5,12 +5,12 @@ import json
 
 import pytest
 
-from grantsearch.filters import RecordFilter
-from grantsearch.ingest import load_records, run_ingest, year_path
-from grantsearch.ingest.base import SourceAdapter
-from grantsearch.ingest.sbir_api import SbirApiAdapter, SbirApiUnavailable
-from grantsearch.ingest.sbir_csv import COLUMN_MAP, SbirCsvAdapter
-from grantsearch.models import Record
+from sbirgrantsearch.filters import RecordFilter
+from sbirgrantsearch.ingest import load_records, run_ingest, year_path
+from sbirgrantsearch.ingest.base import SourceAdapter
+from sbirgrantsearch.ingest.sbir_api import SbirApiAdapter, SbirApiUnavailable
+from sbirgrantsearch.ingest.sbir_csv import COLUMN_MAP, SbirCsvAdapter
+from sbirgrantsearch.models import Record
 
 ABSTRACT = (
     "The Department of Homeland Security grapples with vast and diverse "

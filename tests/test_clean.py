@@ -2,7 +2,7 @@
 
 import pytest
 
-from grantsearch.clean import (
+from sbirgrantsearch.clean import (
     AGENCY_NAMES,
     agency_display,
     agency_label,

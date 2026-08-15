@@ -1,4 +1,4 @@
-# grantsearch
+# sbirgrantsearch
 
 A Python library for downloading US government innovation-funding records
 into one common schema, filtered the way you ask for them.
@@ -9,7 +9,7 @@ either way — same fields, same `record_id` — so the fallback is an
 operational detail, not something your code handles.
 
 ```python
-import grantsearch as gs
+import sbirgrantsearch as gs
 
 awards = gs.download(agency="NASA", state="CA", years=2023, min_amount=500_000)
 
@@ -24,7 +24,7 @@ Stdlib only — no dependencies.
 ## Install
 
 ```bash
-pip install grantsearch
+pip install sbirgrantsearch
 ```
 
 Or from source:
@@ -143,7 +143,7 @@ record.agency_label  # "Health and Human Services - National Institutes of Healt
 
 ## Schema
 
-`Record` (`grantsearch/models.py`) is the common schema every source
+`Record` (`sbirgrantsearch/models.py`) is the common schema every source
 normalizes into:
 
 - `abstract` is the source text; **`abstract_clean`** is the search-facing
@@ -173,17 +173,17 @@ holds by construction; `recipient_type` is always `company`.
 ## CLI
 
 ```bash
-grantsearch ingest --years 2015-2025 --agency NASA --state CA
-grantsearch profile data/raw --branch NIH
-grantsearch probe-api
+sbirgrantsearch ingest --years 2015-2025 --agency NASA --state CA
+sbirgrantsearch profile data/raw --branch NIH
+sbirgrantsearch probe-api
 ```
 
 Same filters as the library, as `--flags`.
 
 ## Adding a source
 
-Subclass `SourceAdapter` (`grantsearch/ingest/base.py`) with `fetch_year`
-and `normalize`, then register it in `grantsearch/ingest/__init__.py`. The
+Subclass `SourceAdapter` (`sbirgrantsearch/ingest/base.py`) with `fetch_year`
+and `normalize`, then register it in `sbirgrantsearch/ingest/__init__.py`. The
 driver, JSONL layout, resume logic, dedupe and filtering are shared.
 
 Set `name` to the transport slug and `source` to the logical dataset. Two

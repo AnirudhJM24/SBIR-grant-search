@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-import grantsearch
+import sbirgrantsearch
 
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 pytestmark = pytest.mark.skipif(
@@ -24,7 +24,7 @@ def project() -> dict:
 
 def test_version_matches_package(project):
     """__version__ and the packaged version must not drift apart."""
-    assert project["version"] == grantsearch.__version__
+    assert project["version"] == sbirgrantsearch.__version__
 
 
 def test_declared_license_has_a_file(project):
@@ -36,7 +36,7 @@ def test_declared_license_has_a_file(project):
 def test_typed_claim_is_backed_by_marker(project):
     """The Typing :: Typed classifier is a promise about py.typed."""
     if "Typing :: Typed" in project["classifiers"]:
-        assert (PYPROJECT.parent / "grantsearch" / "py.typed").exists()
+        assert (PYPROJECT.parent / "sbirgrantsearch" / "py.typed").exists()
 
 
 def test_core_has_no_runtime_dependencies(project):
@@ -45,12 +45,12 @@ def test_core_has_no_runtime_dependencies(project):
 
 
 def test_console_script_target_is_importable(project):
-    module, _, attr = project["scripts"]["grantsearch"].partition(":")
+    module, _, attr = project["scripts"]["sbirgrantsearch"].partition(":")
     imported = __import__(module, fromlist=[attr])
     assert callable(getattr(imported, attr))
 
 
 def test_public_api_is_importable():
     """Everything in __all__ must actually resolve."""
-    for name in grantsearch.__all__:
-        assert hasattr(grantsearch, name), f"__all__ exports missing {name}"
+    for name in sbirgrantsearch.__all__:
+        assert hasattr(sbirgrantsearch, name), f"__all__ exports missing {name}"

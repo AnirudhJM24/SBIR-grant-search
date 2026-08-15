@@ -18,7 +18,7 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "grantsearch/0.1 (public-innovation-search; research use)"
+USER_AGENT = "sbirgrantsearch/0.1 (public-innovation-search; research use)"
 DEFAULT_TIMEOUT = 60
 # Transient statuses. 403 is included because SBIR.gov currently returns it
 # while its API is under maintenance -- retrying costs little and the

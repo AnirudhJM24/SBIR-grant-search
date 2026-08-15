@@ -4,7 +4,7 @@ STATUS (verified 2026-08-15): the endpoint returns ``{"message": "Forbidden"}``
 for every request -- SBIR.gov's public APIs are under maintenance following
 their site rebuild. This adapter is written and tested against the documented
 contract so it works the day the API returns; until then use
-:class:`~grantsearch.ingest.sbir_csv.SbirCsvAdapter`, which reads the bulk
+:class:`~sbirgrantsearch.ingest.sbir_csv.SbirCsvAdapter`, which reads the bulk
 export and produces identical records.
 
 Call :meth:`SbirApiAdapter.probe` to check whether the API is back.
