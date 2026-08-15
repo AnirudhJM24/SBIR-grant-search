@@ -65,6 +65,9 @@ _DATE_FORMATS = (
     "%Y/%m/%d",
     "%d-%b-%Y",  # 07-May-2024
     "%b %d, %Y",  # May 7, 2024
+    "%B %d, %Y",  # September 23, 2026 -- the topics export spells it out
+    "%d %B %Y",
+    "%d %b %Y",
     "%m/%d/%y",
     "%Y%m%d",
 )

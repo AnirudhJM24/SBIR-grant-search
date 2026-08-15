@@ -130,6 +130,39 @@ this by content type and re-runs the year agency by agency.
 Probe results are cached for 5 minutes, so several `download()` calls cost
 one round trip.
 
+## Topics
+
+Awards are what *was* funded; **topics** are what agencies are asking for now.
+Same mechanism, separate schema — a topic has no recipient and no award
+amount, so it is a `Topic`, not a `Record`.
+
+```python
+open_topics = gs.download_topics()                      # defaults to open
+gs.download_topics(agency="NSF", keywords="quantum")
+gs.download_topics(agency="NIH", closes_before="2026-12-31")
+gs.download_topics(status="closed", years=2024)         # the archive
+```
+
+```python
+t = gs.download_topics()
+t.summary()          # "337 topics | 337 open | 3 agencies"
+t.closing_soon(10)   # nearest close dates first, open only
+t.by_agency()        # {"NSF": [...], "DOD": [...]}
+t.filter_by(contains="autonomy")
+t.to_csv("topics.csv")
+```
+
+`keywords=` is run server-side; `contains=` is a local substring filter
+applied afterwards. From the CLI:
+
+```bash
+sbirgrantsearch topics --agency NSF --keywords quantum
+sbirgrantsearch topics --closes-before 2026-12-31 --out topics.csv
+```
+
+Only agencies with live solicitations appear in open topics — at the time of
+writing that is NSF, DoD and HHS, not all 44.
+
 ## Agency names
 
 Records store a short **code** because it's the stable filter key; the

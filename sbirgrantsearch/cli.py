@@ -199,6 +199,39 @@ def cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_topics(args: argparse.Namespace) -> int:
+    """List solicitation topics, newest closing date first."""
+    from .topics import download_topics
+
+    results = download_topics(
+        agency=args.agency, years=args.year, status=args.status,
+        program=args.program, phase=args.phase, keywords=args.keywords,
+        contains=args.contains, closes_after=args.closes_after,
+        closes_before=args.closes_before,
+    )
+    if not results:
+        print("No topics matched.")
+        return 1
+
+    print(results.summary())
+    print()
+    print(f"{'CLOSES':<12} {'AGENCY':<7} {'NUMBER':<18} TITLE")
+    ordered = sorted(results, key=lambda t: (t.close_date or "9999", t.agency))
+    for topic in ordered[: args.limit]:
+        print(
+            f"{topic.close_date or '-':<12} {topic.agency:<7} "
+            f"{(topic.topic_number or '-')[:18]:<18} {topic.title[:44]}"
+        )
+    if len(ordered) > args.limit:
+        print(f"... and {len(ordered) - args.limit:,} more")
+
+    if args.out:
+        path = (results.to_csv(args.out) if str(args.out).endswith(".csv")
+                else results.to_jsonl(args.out))
+        print(f"\nwrote {path}")
+    return 0
+
+
 def cmd_probe_api(args: argparse.Namespace) -> int:
     """Check whether the SBIR.gov JSON API has come back online."""
     if SbirApiAdapter().probe():
@@ -242,6 +275,26 @@ def main(argv: list[str] | None = None) -> int:
     p_profile.add_argument("path", type=Path, nargs="?", default=Path("data/raw"))
     add_filter_args(p_profile)
     p_profile.set_defaults(func=cmd_profile)
+
+    p_topics = sub.add_parser("topics", help="List solicitation topics")
+    p_topics.add_argument("--agency", action="append", metavar="AGENCY",
+                          help="Agency or sub-agency, e.g. NSF, NIH, DARPA")
+    p_topics.add_argument("--year", action="append", type=int,
+                          help="Solicitation year (repeatable)")
+    p_topics.add_argument("--status", choices=["open", "closed"],
+                          help="Defaults to open topics")
+    p_topics.add_argument("--program", choices=["SBIR", "STTR"])
+    p_topics.add_argument("--phase", metavar="PHASE", help='e.g. "Phase I"')
+    p_topics.add_argument("--keywords", metavar="TEXT",
+                          help="Full-text query, run server-side")
+    p_topics.add_argument("--contains", metavar="TEXT",
+                          help="Substring filter applied after download")
+    p_topics.add_argument("--closes-after", metavar="DATE")
+    p_topics.add_argument("--closes-before", metavar="DATE")
+    p_topics.add_argument("--limit", type=int, default=25)
+    p_topics.add_argument("--out", type=Path, metavar="PATH",
+                          help="Write results to .csv or .jsonl")
+    p_topics.set_defaults(func=cmd_topics)
 
     p_probe = sub.add_parser("probe-api", help="Check if the SBIR.gov API is up")
     p_probe.set_defaults(func=cmd_probe_api)

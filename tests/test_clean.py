@@ -47,6 +47,9 @@ def test_parse_amount(raw, expected):
         ("2024-05-07T00:00:00.000Z", "2024-05-07"),
         ("07-May-2024", "2024-05-07"),
         ("May 7, 2024", "2024-05-07"),
+        ("September 23, 2026", "2026-09-23"),   # SBIR.gov topics export
+        ("August 5, 2026", "2026-08-05"),
+        ("23 September 2026", "2026-09-23"),
         ("", None),
         ("N/A", None),
         (None, None),

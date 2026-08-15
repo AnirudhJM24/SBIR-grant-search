@@ -17,6 +17,7 @@ from .clean import AGENCY_NAMES, BRANCH_NAMES, agency_display, agency_label
 from .filters import POTENTIAL_SPINOUTS, RETRIEVABLE, STARTUPS_ONLY, RecordFilter, any_of
 from .ingest import load_records
 from .models import Record
+from .topics import SbirTopicsClient, Topic, TopicResults, download_topics
 
 __version__ = "0.0.1"
 
@@ -28,11 +29,15 @@ __all__ = [
     "STARTUPS_ONLY",
     "Download",
     "Record",
+    "SbirTopicsClient",
+    "Topic",
+    "TopicResults",
     "RecordFilter",
     "agency_display",
     "agency_label",
     "any_of",
     "download",
+    "download_topics",
     "load_records",
     "make_filter",
     "stream",
