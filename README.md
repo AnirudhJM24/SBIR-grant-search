@@ -1,7 +1,8 @@
 # sbirgrantsearch
 
-A Python library for downloading US government innovation-funding records
-into one common schema, filtered the way you ask for them.
+A Python library for downloading US government innovation-funding data —
+SBIR/STTR **awards** and open **solicitation topics** — into one common
+schema, filtered the way you ask for it.
 
 You say *what* you want. The library works out *how* to get it, falling back
 across three transports — the JSON API, the site's filtered CSV export, and
@@ -72,7 +73,7 @@ mode hardest to notice.
 ```python
 d = gs.download(agency="DOE", years=2023)
 
-len(d), d.transport            # 156, "search"
+len(d), d.transport            # 552, "search"
 d[0].title                     # indexable and iterable
 d.filter_by(state="CA")        # narrow further, no refetch
 d.by_company()                 # {normalized name: [records]}, biggest first
@@ -123,9 +124,14 @@ switch.
 
 **Two things to know about `search`.** It is an undocumented form endpoint,
 not a public API, so it can change without notice — which is why the bulk CSV
-stays as the guaranteed floor. And past ~10,000 rows it returns a redirect
-rather than an error, so a cap hit looks like success; the adapter detects
-this by content type and re-runs the year agency by agency.
+stays as the guaranteed floor.
+
+And its failure modes are quiet. Past ~10,000 rows it redirects to HTML
+instead of erroring — *and answers an empty query exactly the same way*, with
+no distinguishing message. A non-CSV response is therefore ambiguous, so the
+adapter halves the agency set to tell the two apart: a genuinely oversized
+slice returns CSV once split, an empty one stays empty. Detection is by
+content type; a 200 alone means nothing here.
 
 Probe results are cached for 5 minutes, so several `download()` calls cost
 one round trip.
@@ -223,8 +229,8 @@ dropped: they can't be retrieved and only distort IDF weights.
 `record_id` is `sbir:{agency}:{contract}`, falling back to a content hash
 when a row has neither a contract nor a tracking number. It excludes the
 title so it survives the source rewording a project name, and it's keyed on
-the **logical source** rather than the transport — which is what lets the
-API and CSV paths produce interchangeable records.
+the **logical source** rather than the transport — which is what lets all
+three paths produce interchangeable records.
 
 Every row is an SBIR/STTR award to a small business, so "startups only"
 holds by construction; `recipient_type` is always `company`.
@@ -234,6 +240,7 @@ holds by construction; `recipient_type` is always `company`.
 ```bash
 sbirgrantsearch ingest --years 2015-2025 --agency NASA --state CA
 sbirgrantsearch profile data/raw --branch NIH
+sbirgrantsearch topics --agency NSF --keywords quantum
 sbirgrantsearch probe-api
 ```
 
@@ -249,19 +256,20 @@ Set `name` to the transport slug and `source` to the logical dataset. Two
 transports serving the same dataset share a `source`, which is what makes
 them interchangeable.
 
-`fetch_year` receives the active filter as a **hint** for pushdown — the API
-adapter uses it to sweep one agency instead of eleven. The driver reapplies
-the filter regardless, so ignoring the hint is always correct.
+`fetch_year` receives the active filter as a **hint** for pushdown — the
+search adapter uses it to query one agency instead of all of them. The driver
+reapplies the filter regardless, so ignoring the hint is always correct.
 
 ## Tests
 
 ```bash
-python -m pytest tests -q    # 166 tests, no network required
+python -m pytest tests -q    # 216 tests, no network required
 ```
 
 Parser tests encode the actual junk in federal exports (`"171,433"`,
-`"(500)"`, `"01/01/1900"`, double-escaped entities); fallback tests cover
-transport selection, pinning, and id equality across paths.
+`"(500)"`, `"01/01/1900"`, `"September 23, 2026"`, double-escaped entities);
+transport tests cover selection, pinning, id equality across paths, and the
+empty-versus-capped ambiguity.
 
 ## License
 

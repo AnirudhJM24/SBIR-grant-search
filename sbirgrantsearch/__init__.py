@@ -19,7 +19,7 @@ from .ingest import load_records
 from .models import Record
 from .topics import SbirTopicsClient, Topic, TopicResults, download_topics
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 __all__ = [
     "AGENCY_NAMES",

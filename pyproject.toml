@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbirgrantsearch"
-version = "0.0.1"
+version = "0.1.0"
 description = "Download US government innovation-funding records into one common schema, filtered how you ask."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,6 +45,7 @@ dev = ["pytest>=7.0", "build>=1.0", "twine>=5.0"]
 Homepage = "https://github.com/AnirudhJM24/SBIR-grant-search"
 Repository = "https://github.com/AnirudhJM24/SBIR-grant-search"
 Issues = "https://github.com/AnirudhJM24/SBIR-grant-search/issues"
+Changelog = "https://github.com/AnirudhJM24/SBIR-grant-search/blob/main/CHANGELOG.md"
 
 [project.scripts]
 sbirgrantsearch = "sbirgrantsearch.cli:main"
