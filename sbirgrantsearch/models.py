@@ -54,10 +54,18 @@ class Record:
     state: str | None = None
     zip_code: str | None = None
 
+    # Identifiers. The bulk CSV export carries neither, so both are often
+    # None; the filtered search export populates uei reliably.
+    uei: str | None = None
+    duns: str | None = None
+
     # Extras that feed later stages
     ri_name: str | None = None  # STTR research institution -> spinout signal
     company_website: str | None = None
     num_employees: int | None = None
+    country: str | None = None
+    topic_code: str | None = None
+    research_keywords: str | None = None
 
     # Original payload, kept so a missed field never means a refetch.
     raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)

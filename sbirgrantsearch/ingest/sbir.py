@@ -1,8 +1,13 @@
 """SBIR/STTR awards with automatic transport fallback.
 
-One source, two ways in. :class:`SbirSource` prefers the JSON API (targeted
-requests, no big download) and falls back to the bulk CSV export when the
-API is unavailable -- which, as of 2026-08-15, it always is.
+One source, three ways in. :class:`SbirSource` tries them in order of how
+little they make you download:
+
+1. ``api``    -- the JSON API. Down under maintenance as of 2026-08-15.
+2. ``search`` -- the award-search form's filtered CSV export. Richer than
+   the bulk file (it carries UEI, which the bulk file lacks), but capped
+   near 10,000 rows per query.
+3. ``csv``    -- the ~367 MB bulk export. Always works, always complete.
 
 Both transports produce byte-identical :class:`~sbirgrantsearch.models.Record`
 objects, including ``record_id``, so which one served a given run is an
@@ -21,10 +26,11 @@ from ..models import Record
 from .base import SourceAdapter
 from .sbir_api import SbirApiAdapter, SbirApiUnavailable
 from .sbir_csv import SbirCsvAdapter
+from .sbir_search import SbirSearchAdapter, SbirSearchUnavailable
 
 log = logging.getLogger(__name__)
 
-Transport = Literal["auto", "api", "csv"]
+Transport = Literal["auto", "api", "search", "csv"]
 
 
 class SbirSource(SourceAdapter):
@@ -35,9 +41,9 @@ class SbirSource(SourceAdapter):
         >>> source.transport_used
         'csv'
 
-    ``transport="auto"`` (the default) probes the API once and falls back;
-    ``"api"`` and ``"csv"`` pin a transport and fail loudly if it is down,
-    which is what you want in a reproducible pipeline.
+    ``transport="auto"`` (the default) probes each in turn and falls back;
+    naming one pins it and fails loudly if it is down, which is what you
+    want in a reproducible pipeline.
     """
 
     name = "sbir"
@@ -62,15 +68,17 @@ class SbirSource(SourceAdapter):
             refresh: re-download the bulk CSV even if cached.
             api_kwargs: extra options for :class:`SbirApiAdapter`.
         """
-        if transport not in ("auto", "api", "csv"):
+        if transport not in ("auto", "api", "search", "csv"):
             raise ValueError(
-                f"transport must be 'auto', 'api' or 'csv', got {transport!r}"
+                "transport must be 'auto', 'api', 'search' or 'csv', "
+                f"got {transport!r}"
             )
         self.transport = transport
         self.min_abstract_chars = min_abstract_chars
         self._api = SbirApiAdapter(
             min_abstract_chars=min_abstract_chars, **(api_kwargs or {})
         )
+        self._search = SbirSearchAdapter(min_abstract_chars=min_abstract_chars)
         self._csv = SbirCsvAdapter(
             cache_dir=cache_dir,
             csv_path=csv_path,
@@ -104,29 +112,39 @@ class SbirSource(SourceAdapter):
         if self._active is not None:
             return
 
-        if self.transport == "api":
-            self._api.prepare()  # raises SbirApiUnavailable if down
-            self._active = self._api
+        pinned = {
+            "api": self._api,
+            "search": self._search,
+            "csv": self._csv,
+        }.get(self.transport)
+        if pinned is not None:
+            pinned.prepare()  # raises if that transport is unavailable
+            self._active = pinned
             return
 
-        if self.transport == "csv":
-            self._csv.prepare()
-            self._active = self._csv
+        # auto: cheapest first, bulk download last.
+        for adapter, note in (
+            (self._api, "targeted JSON requests"),
+            (self._search, "filtered CSV exports (includes UEI)"),
+        ):
+            try:
+                adapter.prepare()
+            except (SbirApiUnavailable, SbirSearchUnavailable, OSError) as exc:
+                log.info(
+                    "%s unavailable (%s); trying the next transport.",
+                    adapter.name, exc.__class__.__name__,
+                )
+                continue
+            log.info("using %s via %s.", note, adapter.name)
+            self._active = adapter
             return
 
-        try:
-            self._api.prepare()
-        except (SbirApiUnavailable, OSError) as exc:
-            log.info(
-                "SBIR.gov API unavailable (%s); falling back to the bulk CSV "
-                "export. Records are identical either way.",
-                exc.__class__.__name__,
-            )
-            self._csv.prepare()
-            self._active = self._csv
-        else:
-            log.info("SBIR.gov API is available; using targeted requests.")
-            self._active = self._api
+        log.info(
+            "falling back to the bulk CSV export. Records are identical "
+            "either way, though UEI is absent from the bulk file."
+        )
+        self._csv.prepare()
+        self._active = self._csv
 
     # -- SourceAdapter -----------------------------------------------------
 

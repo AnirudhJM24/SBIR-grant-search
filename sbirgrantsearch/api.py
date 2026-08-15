@@ -237,8 +237,9 @@ def download(
 
     Args:
         years: int, range, iterable, or ``"2015-2025"``. Defaults to 2015-2025.
-        transport: ``"auto"`` tries the JSON API and falls back to the bulk
-            CSV; ``"api"`` or ``"csv"`` pins one and fails if it is down.
+        transport: ``"auto"`` tries the JSON API, then the filtered search
+            export, then the bulk CSV; ``"api"``, ``"search"`` or ``"csv"``
+            pins one and fails if it is unavailable.
         out_dir: also persist to one JSONL file per year here. Existing
             years are reused rather than refetched unless ``overwrite``.
         cache_dir: where the bulk CSV is cached between runs.

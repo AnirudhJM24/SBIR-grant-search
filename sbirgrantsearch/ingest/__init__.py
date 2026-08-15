@@ -11,11 +11,13 @@ from .base import (
 from .sbir import SbirSource, Transport
 from .sbir_api import SbirApiAdapter, SbirApiUnavailable
 from .sbir_csv import SbirCsvAdapter
+from .sbir_search import SbirSearchAdapter, SbirSearchUnavailable
 
 #: Adapter registry -- the CLI and tests resolve sources by name through here.
 ADAPTERS: dict[str, type[SourceAdapter]] = {
     SbirSource.name: SbirSource,
     SbirCsvAdapter.name: SbirCsvAdapter,
+    SbirSearchAdapter.name: SbirSearchAdapter,
     SbirApiAdapter.name: SbirApiAdapter,
 }
 
@@ -40,6 +42,8 @@ __all__ = [
     "Transport",
     "SbirApiUnavailable",
     "SbirCsvAdapter",
+    "SbirSearchAdapter",
+    "SbirSearchUnavailable",
     "SourceAdapter",
     "get_adapter",
     "load_records",

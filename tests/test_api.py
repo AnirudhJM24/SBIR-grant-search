@@ -89,18 +89,43 @@ def local_csv(tmp_path):
     return path
 
 
-def test_auto_falls_back_to_csv_when_api_is_down(local_csv, monkeypatch):
+def test_auto_falls_back_to_csv_when_everything_else_is_down(
+    local_csv, monkeypatch
+):
+    """The bulk CSV is the floor: it is tried only after the others fail."""
     monkeypatch.setattr(
         "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: False,
     )
     source = SbirSource(transport="auto", csv_path=local_csv)
     source.prepare()
     assert source.transport_used == "csv"
 
 
+def test_auto_prefers_search_over_bulk_csv(local_csv, monkeypatch):
+    """Search beats the bulk file: no 367 MB download, and it has UEI."""
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: False
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: True,
+    )
+    source = SbirSource(transport="auto", csv_path=local_csv)
+    source.prepare()
+    assert source.transport_used == "search"
+
+
 def test_auto_prefers_api_when_it_is_up(local_csv, monkeypatch):
     monkeypatch.setattr(
         "sbirgrantsearch.ingest.sbir_api.SbirApiAdapter.probe", lambda self: True
+    )
+    monkeypatch.setattr(
+        "sbirgrantsearch.ingest.sbir_search.SbirSearchAdapter.probe",
+        lambda self: False,
     )
     source = SbirSource(transport="auto", csv_path=local_csv)
     source.prepare()

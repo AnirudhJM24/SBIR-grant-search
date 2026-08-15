@@ -297,6 +297,20 @@ def join_address(*parts: object) -> str | None:
     return ", ".join(cleaned) or None
 
 
+def normalize_identifier(value: object) -> str | None:
+    """Normalize a UEI or DUNS: upper-cased, stripped, blanks to None.
+
+    Sources emit placeholder junk here more often than real blanks, so
+    obvious sentinels are discarded rather than stored as if meaningful.
+    """
+    if value is None:
+        return None
+    text = re.sub(r"[^A-Za-z0-9]", "", str(value)).upper()
+    if not text or set(text) <= {"0"} or text in {"NA", "NULL", "NONE", "TBD"}:
+        return None
+    return text
+
+
 def clean_text(value: object) -> str | None:
     """Trim a short free-text field; blanks become ``None``."""
     if value is None:

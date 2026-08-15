@@ -3,10 +3,11 @@
 A Python library for downloading US government innovation-funding records
 into one common schema, filtered the way you ask for them.
 
-You say *what* you want. The library works out *how* to get it: the JSON API
-when it's up, the bulk CSV export when it isn't. The records are identical
-either way — same fields, same `record_id` — so the fallback is an
-operational detail, not something your code handles.
+You say *what* you want. The library works out *how* to get it, falling back
+across three transports — the JSON API, the site's filtered CSV export, and
+the full bulk download — until one answers. The records are identical either
+way, same fields and same `record_id`, so which one served your query is an
+operational detail rather than something your code handles.
 
 ```python
 import sbirgrantsearch as gs
@@ -14,7 +15,7 @@ import sbirgrantsearch as gs
 awards = gs.download(agency="NASA", state="CA", years=2023, min_amount=500_000)
 
 print(awards.summary())
-# 7 awards | 7 companies | $6,204,891 | 2023-2023 | via csv
+# 31 awards | 28 companies | $29,650,957 | 2023-2023 | via search
 
 awards.to_csv("nasa_ca.csv")
 ```
@@ -71,7 +72,7 @@ mode hardest to notice.
 ```python
 d = gs.download(agency="DOE", years=2023)
 
-len(d), d.transport            # 156, "csv"
+len(d), d.transport            # 156, "search"
 d[0].title                     # indexable and iterable
 d.filter_by(state="CA")        # narrow further, no refetch
 d.by_company()                 # {normalized name: [records]}, biggest first
@@ -96,26 +97,38 @@ d.stats.summary()
 
 ## Transports
 
+Three ways in, tried in order of how little they make you download:
+
 | Transport | Status | How it works |
 |---|---|---|
-| `api` | **down** | Targeted JSON requests; agency filters push down server-side |
-| `csv` | **working** | One ~367 MB bulk export, cached, then filtered locally |
+| `api` | **down** | Targeted JSON requests |
+| `search` | **working** | The award-search form's filtered CSV export. Agency, sub-agency, year, state, phase and program all filter server-side. **Carries UEI.** Capped near 10,000 rows per query |
+| `csv` | **working** | One ~367 MB bulk export, cached, then filtered locally. Always complete |
 
 As of 2026-08-15 the SBIR.gov JSON API returns `{"message":"Forbidden"}` for
 every request — their public APIs are under maintenance. `transport="auto"`
-(the default) handles this: it probes once, logs the fallback, and uses the
-bulk CSV.
+(the default) handles that by moving to `search`, so a narrow query costs one
+small request instead of a 367 MB download.
 
 ```python
-gs.download(...)                     # auto: API if up, CSV if not
-gs.download(..., transport="csv")    # pin the CSV
-gs.download(..., transport="api")    # pin the API; raises if it's down
+gs.download(...)                       # auto: api -> search -> csv
+gs.download(..., transport="search")   # pin the filtered export
+gs.download(..., transport="csv")      # pin the bulk file
+gs.download(..., transport="api")      # pin the API; raises if it's down
 ```
 
 Pin a transport when you need determinism — `auto` is for convenience, and a
 pipeline that must be reproducible should fail loudly rather than silently
-switch. Probe results are cached for 5 minutes, so several `download()`
-calls cost one round trip.
+switch.
+
+**Two things to know about `search`.** It is an undocumented form endpoint,
+not a public API, so it can change without notice — which is why the bulk CSV
+stays as the guaranteed floor. And past ~10,000 rows it returns a redirect
+rather than an error, so a cap hit looks like success; the adapter detects
+this by content type and re-runs the year agency by agency.
+
+Probe results are cached for 5 minutes, so several `download()` calls cost
+one round trip.
 
 ## Agency names
 
@@ -159,9 +172,13 @@ normalizes into:
   version (HTML stripped, `"DESCRIPTION (provided by applicant):"`-style
   headers removed, whitespace collapsed). Retrieval indexes `search_text`
   (title + clean abstract + company).
-- **`recipient_norm`** is the company join key
-  (`"AGILE DATA DECISIONS, INC."` → `"agile data decisions"`). The bulk
-  export has **no UEI**, so company aggregation keys on this.
+- **`uei`** is the government company identifier. The `search` transport
+  populates it on essentially every row; the bulk export has **no UEI
+  column at all**, so it is `None` there. Prefer it for company
+  aggregation when present.
+- **`recipient_norm`** is the fallback company join key
+  (`"AGILE DATA DECISIONS, INC."` → `"agile data decisions"`), and the only
+  one available on the bulk path.
 - **`ri_name`** is the STTR research-institution partner — the
   university-spinout signal, present on all STTRs (~16% of records).
 - `raw` keeps the original source row, so a missed field is a local reparse

@@ -218,11 +218,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ingest = sub.add_parser("ingest", help="Fetch and normalize a source")
     p_ingest.add_argument("--source", default="sbir",
-                          choices=["sbir", "sbir_csv", "sbir_api"],
+                          choices=["sbir", "sbir_csv", "sbir_search", "sbir_api"],
                           help="'sbir' auto-selects a transport (default)")
     p_ingest.add_argument("--transport", default="auto",
-                          choices=["auto", "api", "csv"],
-                          help="For --source sbir: which transport to use")
+                          choices=["auto", "api", "search", "csv"],
+                          help="For --source sbir: api > search > csv, "
+                               "or pin one")
     p_ingest.add_argument("--years", type=parse_years, default="2015-2025",
                           help='e.g. "2015-2025" or "2020,2022" (default: 2015-2025)')
     p_ingest.add_argument("--out-dir", type=Path, default=Path("data/raw"))
