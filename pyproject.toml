@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,43 @@ version = "0.1.0"
 description = "Download US government innovation-funding records into one common schema, filtered how you ask."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-keywords = ["sbir", "sttr", "grants", "government", "innovation", "search"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Anirudh JM" }]
+keywords = [
+    "sbir",
+    "sttr",
+    "grants",
+    "government",
+    "innovation",
+    "funding",
+    "search",
+    "open-data",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Database :: Front-Ends",
+    "Typing :: Typed",
+]
 dependencies = []  # stdlib only
 
 [project.optional-dependencies]
 pandas = ["pandas>=2.0"]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0", "twine>=5.0"]
+
+[project.urls]
+Homepage = "https://github.com/AnirudhJM24/SBIR-grant-search"
+Repository = "https://github.com/AnirudhJM24/SBIR-grant-search"
+Issues = "https://github.com/AnirudhJM24/SBIR-grant-search/issues"
 
 [project.scripts]
 grantsearch = "grantsearch.cli:main"
@@ -24,3 +54,6 @@ include = ["grantsearch*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+grantsearch = ["py.typed"]
