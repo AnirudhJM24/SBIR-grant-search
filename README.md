@@ -35,14 +35,125 @@ Or from source:
 pip install git+https://github.com/AnirudhJM24/SBIR-grant-search.git
 ```
 
-## Demo
+## A quick tour
 
 ```bash
 python examples/demo.py 2023
 ```
 
-A tour of the whole library against real data: fallback, composed filters,
-agency naming, the spinout signal, company grouping and exports.
+Every number below is fetched live — nothing is canned. One request pulls
+the year; the rest is local filtering.
+
+```
+╭────────────────────────────────────────────────────────────────────────╮
+│ sbirgrantsearch · FY2023                                               │
+│ US innovation funding: who got paid, and what's being asked for next   │
+╰────────────────────────────────────────────────────────────────────────╯
+
+▌ 1. One call gets the year
+  The transport picks itself: JSON API, else filtered CSV, else bulk.
+──────────────────────────────────────────────────────────────────────────
+  >>> awards = gs.download(years=2023)
+
+  awards    companies   total funding   median award   transport
+  ······························································
+  5,998     3,571       $4.4B           $284.5K        search
+
+▌ 2. Where the money goes
+──────────────────────────────────────────────────────────────────────────
+  >>> awards.by_agency()  # via record.agency_name
+
+  Department of Defense          ██████████████████████████     $2.2B
+  Health and Human Services      █████████████████░░░░░░░░░     $1.5B
+  Department of Energy           ███░░░░░░░░░░░░░░░░░░░░░░░   $289.9M
+  National Science Foundation    ███░░░░░░░░░░░░░░░░░░░░░░░   $214.2M
+  NASA                           ██░░░░░░░░░░░░░░░░░░░░░░░░   $182.5M
+  Department of Agriculture      ░░░░░░░░░░░░░░░░░░░░░░░░░░    $39.5M
+  Department of Commerce         ░░░░░░░░░░░░░░░░░░░░░░░░░░    $19.2M
+
+▌ 3. Filters compose, and narrow without refetching
+──────────────────────────────────────────────────────────────────────────
+  >>> awards.filter_by(agency="NASA", state="CA")
+
+  filter                            awards       funding
+  ······················································
+  NASA, California                     108        $41.4M
+  NIH (sub-agency of HHS)            1,329         $1.4B
+  DARPA                                115       $179.1M
+  Phase II over $1M                  1,835         $3.3B
+  "quantum" anywhere                   142        $76.0M
+  "autonomous" anywhere                302       $219.7M
+
+▌ 4. Roll up to companies
+  Keyed on UEI where present; the bulk export has none, search does.
+──────────────────────────────────────────────────────────────────────────
+  >>> awards.by_company()
+
+  ✓ 5,998/5,998 records carry a UEI
+
+  company                           uei            awards       total
+  ···································································
+  PHYSICAL SCIENCES INC.            RMG1AZ1ZH8Q7       64      $38.7M
+  TRITON SYSTEMS, INC.              DA91DUWSMSQ7       46      $29.2M
+  CFD Research Corporation          V3KCP1HNFM33       37      $24.4M
+  SPECTRAL ENERGIES LLC             C3DAVH4VJDG3       36      $16.5M
+  TDA RESEARCH, INC.                MK5ANJVWVZK7       29      $16.9M
+  LUNA LABS USA LLC                 M6JVSYRQRYM9       27      $18.4M
+
+▌ 5. Potential university spinouts
+  STTR awards name their research partner: a company commercialising
+  university work.
+──────────────────────────────────────────────────────────────────────────
+  >>> awards.filter_by(program="STTR", require_ri=True)
+
+  1,040 of 5,998 awards name a university
+
+  company                         state  research partner
+  ·······················································
+  EOS ENERGETICS, INC.            CO     Battelle Memorial Institute
+  M4 ENGINEERING, INC.            CA     Mississippi State University
+  GLINT PHOTONICS, INC.           CA     UNC Charlotte
+  BEAM ENGINEERING FOR ADVANCED   FL     Rochester Institute of Technol
+  AWAREABILITY TECHNOLOGIES, LLC  OH     The Ohio State University
+  CALIOLA ENGINEERING, LLC        CO     University of Southern Califor
+
+▌ 6. Abstracts arrive clean, ready to index
+──────────────────────────────────────────────────────────────────────────
+  >>> record.abstract_clean  # boilerplate and markup stripped
+
+  Cybernetic Training for Autonomous Robots - Human Augmentation via Gen
+  SARCOS GROUP LC · Department of Defense - USAF · $38.6M
+
+  The Sarcos Cybernetic Training for Autonomous Robots - Human
+  Augmentation via Generalizable Mobile Autonomous Robot Dexterity (C-H)
+  program is a second Air Force SBIR Phase II. C-H advances Sarcos' vision
+  of leveraging the expertise of competent task perf
+
+▌ 7. What agencies want funded next
+  Open solicitations — the forward-looking half of the picture.
+──────────────────────────────────────────────────────────────────────────
+  >>> gs.download_topics(status="open")
+
+  337 topics | 337 open | 3 agencies
+
+  closes      agency   topic
+  ··························
+  2026-09-21  HHS      Development of therapeutic or preventative techn
+  2026-09-21  HHS      Development of devices, diagnostic technologies,
+  2026-09-23  DOD      Collaborative Distributed Swarm Radar
+  2026-09-23  DOD      Signal Classification and Anomaly Detection in C
+  2026-09-23  DOD      Automated Post-Mission De-Brief and Re-Planning
+  2026-09-23  DOD      DIRECT TO PHASE II: Intelligent Data Analysis of
+
+▌ 8. Take it with you
+──────────────────────────────────────────────────────────────────────────
+  >>> awards.to_csv("awards.csv"); topics.to_csv("topics.csv")
+
+  → awards over $1M      demo_awards.csv        1,843 rows
+  → open topics          demo_topics.csv          337 rows
+
+  also: .to_jsonl() · .to_dicts() · .to_pandas()
+```
 
 ## Downloading
 
