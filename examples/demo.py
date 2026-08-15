@@ -52,10 +52,15 @@ def main() -> None:
     for record in spinouts[:5]:
         print(f"  {record.recipient[:34]:<36} <- {record.ri_name[:30]}")
 
-    rule("5. Group by company (no UEI in the data, so names are normalized)")
+    rule("5. Group by company")
+    with_uei = sum(1 for r in everything if r.uei)
+    print(f"  {with_uei:,}/{len(everything):,} records carry a UEI "
+          f"(the bulk export has none; the search transport does)\n")
     for name, awards in list(everything.by_company().items())[:5]:
         total = sum(a.award_amount or 0 for a in awards)
-        print(f"  {name[:38]:<40} {len(awards):>3} awards  ${total:>12,.0f}")
+        uei = next((a.uei for a in awards if a.uei), "-")
+        print(f"  {name[:32]:<34} {uei:<14} {len(awards):>3} awards  "
+              f"${total:>12,.0f}")
 
     rule("6. Text is cleaned for search")
     record = max(everything, key=lambda r: r.award_amount or 0)
@@ -63,10 +68,17 @@ def main() -> None:
     print(f"  {record.recipient} | {record.agency_name} | ${record.award_amount:,.0f}")
     print(f"\n  {record.abstract_clean[:220]}...")
 
-    rule("7. Export")
+    rule("7. Open solicitation topics (what agencies want funded next)")
+    topics = gs.download_topics()
+    print(f"  {topics.summary()}\n")
+    for topic in topics.closing_soon(5):
+        print(f"  closes {topic.close_date}  {topic.agency:<5} {topic.title[:42]}")
+
+    rule("8. Export")
     top = everything.filter_by(min_amount=1_000_000)
     print(f"  to_csv   -> {top.to_csv('demo_top_awards.csv')} ({len(top)} rows)")
     print(f"  to_jsonl -> {top.to_jsonl('demo_top_awards.jsonl')}")
+    print(f"  topics   -> {topics.to_csv('demo_topics.csv')} ({len(topics)} rows)")
     print("  to_pandas() and to_dicts() are also available\n")
 
 
