@@ -427,17 +427,13 @@ def _form_agencies(agency: Any) -> list[str]:
     for name in _as_iter(agency):
         text = str(name).strip()
         key = text.upper()
-        # A parent department expands to its sub-agencies, so asking for
-        # DOE also covers ARPA-E. This is checked before the direct
-        # checkbox match, which would otherwise stop at DOE alone.
-        if key in AGENCY_TO_FORM:
-            values.extend(AGENCY_TO_FORM[key])
-            continue
-        # A sub-agency stays narrow: NIH means NIH, not all of HHS.
+        # One checkbox per request: a parent box already covers its
+        # sub-agencies, and checking both narrows to the child instead of
+        # unioning them.
         if direct := _FORM_BY_NAME.get(key):
             values.append(direct)
             continue
-        # Anything else -- a full department name -- resolves then expands.
+        # A full department name resolves to its canonical checkbox.
         values.extend(AGENCY_TO_FORM.get(normalize_agency(text) or "", ()))
     return sorted({v for v in values if v in FORM_AGENCIES})
 

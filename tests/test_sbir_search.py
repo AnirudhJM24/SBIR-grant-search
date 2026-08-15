@@ -10,6 +10,7 @@ from sbirgrantsearch.ingest.sbir_search import (
     COLUMN_MAP,
     FORM_AGENCIES,
     RESULT_CAP,
+    TOP_LEVEL_AGENCIES,
     SbirSearchAdapter,
     SbirSearchUnavailable,
 )
@@ -137,10 +138,19 @@ def test_payload_does_not_push_free_text(adapter):
 # -- agency translation ---------------------------------------------------
 
 
-def test_agency_filter_expands_to_form_values(adapter):
+def test_agency_filter_sends_one_checkbox_per_department(adapter):
+    """A parent box already covers its children server-side.
+
+    Checking a parent *and* a child narrows to the child instead of
+    unioning them: DOE alone returns 583 rows for FY2023, DOE+ARPA-E
+    returns 36. So a department filter must send the parent alone.
+    """
     assert adapter._form_agencies(RecordFilter(agencies={"NASA"})) == ["NASA"]
-    doe = adapter._form_agencies(RecordFilter(agencies={"DOE"}))
-    assert set(doe) == {"DOE", "ARPA-E"}
+    assert adapter._form_agencies(RecordFilter(agencies={"DOE"})) == ["DOE"]
+    assert adapter._form_agencies(RecordFilter(agencies={"HHS"})) == ["HHS"]
+    assert adapter._form_agencies(
+        RecordFilter(agencies={"NASA", "NSF"})
+    ) == ["NASA", "NSF"]
 
 
 def test_branch_filter_narrows_to_the_sub_agency(adapter):
@@ -154,6 +164,19 @@ def test_branch_beats_agency_when_both_given(adapter):
     assert adapter._form_agencies(f) == ["NIH"]
 
 
+def test_children_are_disjoint_from_top_level():
+    """Split sets must partition, not overlap with their parent."""
+    from sbirgrantsearch.ingest.sbir_search import (
+        AGENCY_CHILDREN, TOP_LEVEL_AGENCIES,
+    )
+
+    for parent, kids in AGENCY_CHILDREN.items():
+        assert parent in TOP_LEVEL_AGENCIES
+        assert parent not in kids, f"{parent} must not appear among its children"
+        for kid in kids:
+            assert kid in FORM_AGENCIES
+
+
 def test_no_filter_means_no_agency_boxes(adapter):
     assert adapter._form_agencies(None) == []
     assert adapter._form_agencies(RecordFilter()) == []
@@ -163,6 +186,7 @@ def test_every_mapped_form_value_is_a_real_checkbox():
     from sbirgrantsearch.ingest.sbir_search import AGENCY_TO_FORM
 
     for values in AGENCY_TO_FORM.values():
+        assert len(values) == 1, "a filter must send exactly one checkbox"
         for v in values:
             assert v in FORM_AGENCIES, f"{v} is not a form checkbox"
 
@@ -204,7 +228,7 @@ def test_empty_broad_year_costs_a_bounded_number_of_requests(
     assert list(adapter.fetch_year(1970)) == []
     # A full binary tree of depth d is 2**(d+1)-1 nodes.
     assert len(calls) <= 2 ** (adapter.max_split_depth + 1) - 1
-    assert len(calls) < len(FORM_AGENCIES)
+    assert len(calls) < len(TOP_LEVEL_AGENCIES)
 
 
 def test_exhausted_split_budget_warns_instead_of_raising(adapter, monkeypatch, caplog):
@@ -230,7 +254,7 @@ def test_oversized_year_is_split_until_it_fits(adapter, monkeypatch):
 
     drive(adapter, monkeypatch, responder)
     rows = list(adapter.fetch_year(2023))
-    assert len(rows) == len(FORM_AGENCIES)
+    assert len(rows) == len(TOP_LEVEL_AGENCIES)
 
 
 def test_split_stays_within_the_requested_agencies(adapter, monkeypatch):
@@ -242,7 +266,8 @@ def test_split_stays_within_the_requested_agencies(adapter, monkeypatch):
 
     drive(adapter, monkeypatch, responder)
     rows = list(adapter.fetch_year(2023, RecordFilter(agencies={"DOE"})))
-    assert len(rows) == 2  # DOE and ARPA-E, not all 44 form values
+    # DOE splits into its one child, ARPA-E -- never the whole form.
+    assert len(rows) == 1
 
 
 def test_split_depth_is_configurable(monkeypatch):

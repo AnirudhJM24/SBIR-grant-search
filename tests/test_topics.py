@@ -123,7 +123,9 @@ def test_form_agencies_accepts_codes_and_sub_agencies():
     assert _form_agencies("NSF") == ["NSF"]
     assert _form_agencies("NIH") == ["NIH"]
     assert _form_agencies("DARPA") == ["DARPA"]
-    assert set(_form_agencies("DOE")) == {"DOE", "ARPA-E"}
+    # A parent box covers its children; sending both narrows to the child.
+    assert _form_agencies("DOE") == ["DOE"]
+    assert _form_agencies("Department of Energy") == ["DOE"]
     assert _form_agencies(None) == []
 
 

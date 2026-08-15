@@ -64,24 +64,37 @@ FORM_AGENCIES: tuple[str, ...] = (
     "DOI", "DOT", "EPA", "NASA", "NSF", "NRC", "SBA",
 )
 
-#: Canonical agency code -> the form values that cover it. Used to translate
-#: a RecordFilter into checkboxes, and to shard a too-large year.
-AGENCY_TO_FORM: dict[str, tuple[str, ...]] = {
-    "USDA": ("USDA", "NIFA"),
-    "DOC": ("DOC", "NIST", "NOAA"),
-    "DOD": ("DOD", "USAF", "ARMY", "DARPA", "DHA", "DLA", "DMEA", "DTRA",
+#: Parent department -> its sub-agency checkboxes.
+#:
+#: A parent box already covers its children server-side: FY2023 returns
+#: 3,177 rows for DOD and 1,393 for HHS, matching the bulk corpus totals.
+#: Checking a parent *and* a child together does not union them -- it
+#: narrows to the child (DOE alone returns 583 rows, DOE+ARPA-E returns
+#: 36) -- so a filter must send the parent alone. These children are only
+#: for splitting a parent that is too large to download in one request.
+AGENCY_CHILDREN: dict[str, tuple[str, ...]] = {
+    "USDA": ("NIFA",),
+    "DOC": ("NIST", "NOAA"),
+    "DOD": ("USAF", "ARMY", "DARPA", "DHA", "DLA", "DMEA", "DTRA",
             "MDA", "NGA", "NAVY", "CBD", "OSD", "SDA", "SOCOM", "SCO"),
-    "ED": ("ED", "IES", "OSERS"),
-    "DOE": ("DOE", "ARPA-E"),
-    "HHS": ("HHS", "ACL", "ARPA-H", "CDC", "FDA", "NIH"),
-    "DHS": ("DHS", "CWMD", "DNDO", "DNDO-SBIR", "DHS-S&T"),
-    "DOI": ("DOI",),
-    "DOT": ("DOT",),
-    "EPA": ("EPA",),
-    "NASA": ("NASA",),
-    "NSF": ("NSF",),
-    "NRC": ("NRC",),
-    "SBA": ("SBA",),
+    "ED": ("IES", "OSERS"),
+    "DOE": ("ARPA-E",),
+    "HHS": ("ACL", "ARPA-H", "CDC", "FDA", "NIH"),
+    "DHS": ("CWMD", "DNDO", "DNDO-SBIR", "DHS-S&T"),
+}
+
+#: The department-level checkboxes. Together these cover every award, so
+#: they are the split set for an unfiltered query -- 14 requests at worst,
+#: not 44.
+TOP_LEVEL_AGENCIES: tuple[str, ...] = (
+    "USDA", "DOC", "DOD", "ED", "DOE", "HHS", "DHS",
+    "DOI", "DOT", "EPA", "NASA", "NSF", "NRC", "SBA",
+)
+
+#: Canonical agency code -> the checkbox that covers it. One box, never a
+#: parent plus its children.
+AGENCY_TO_FORM: dict[str, tuple[str, ...]] = {
+    code: (code,) for code in TOP_LEVEL_AGENCIES
 }
 
 # CSV header -> neutral field name. Deliberately separate from the bulk
@@ -145,7 +158,7 @@ class SbirSearchAdapter(SourceAdapter):
         timeout: int = 300,
         delay: float = 1.0,
         min_abstract_chars: int = 100,
-        max_split_depth: int = 3,
+        max_split_depth: int = 2,
     ) -> None:
         """
         Args:
@@ -153,9 +166,10 @@ class SbirSearchAdapter(SourceAdapter):
             timeout: seconds to allow per download (large years are slow).
             delay: seconds between requests, to stay polite.
             min_abstract_chars: rows with shorter abstracts are dropped.
-            max_split_depth: how many times a query may be halved. A real
-                cap resolves at the first split, so this mainly bounds the
-                cost of confirming an empty slice (2**depth requests).
+            max_split_depth: how many times a query may be halved. Any
+                real cap resolves at the first split -- the largest whole
+                year is 7,634 rows against a 10,000 limit -- so this
+                mainly bounds the cost of confirming an empty slice.
         """
         self.url = url
         self.timeout = timeout
@@ -222,7 +236,17 @@ class SbirSearchAdapter(SourceAdapter):
             yield from rows
             return
 
-        candidates = list(agencies) if agencies else list(FORM_AGENCIES)
+        candidates = list(agencies) if agencies else list(TOP_LEVEL_AGENCIES)
+        # A single oversized department splits into its sub-agencies; the
+        # parent box already covers them, so this partitions rather than
+        # duplicates.
+        if len(candidates) == 1 and (kids := AGENCY_CHILDREN.get(candidates[0])):
+            log.debug("FY%d: splitting %s into %d sub-agencies",
+                      year, candidates[0], len(kids))
+            for child in kids:
+                yield from self._fetch(year, [child], record_filter,
+                                       depth=depth + 1)
+            return
         if len(candidates) <= 1:
             log.debug(
                 "FY%d agencies=%s returned no CSV at the narrowest slice; "
@@ -312,6 +336,7 @@ class SbirSearchAdapter(SourceAdapter):
             for code in record_filter.agencies:
                 values.extend(AGENCY_TO_FORM.get(code, (code,)))
             return sorted({v for v in values if v in FORM_AGENCIES})
+
 
         return []
 
