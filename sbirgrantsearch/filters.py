@@ -177,6 +177,38 @@ class RecordFilter:
         """Lazily filter an iterable of records."""
         return (r for r in records if self.matches(r))
 
+    def describe(self) -> str:
+        """Render the active constraints, e.g. ``"agency=NASA, state=NY"``.
+
+        Used to explain an empty result, where knowing what was asked for
+        matters more than knowing that nothing came back.
+        """
+        parts: list[str] = []
+        for name, label in (
+            ("sources", "source"), ("agencies", "agency"),
+            ("branches", "branch"), ("programs", "program"),
+            ("phases", "phase"), ("states", "state"),
+            ("recipient_types", "recipient_type"), ("fiscal_years", "year"),
+        ):
+            if values := getattr(self, name):
+                parts.append(f"{label}={'/'.join(sorted(str(v) for v in values))}")
+        for name, label in (
+            ("fiscal_year_min", "year>="), ("fiscal_year_max", "year<="),
+            ("start_after", "start>="), ("start_before", "start<="),
+            ("end_after", "end>="), ("end_before", "end<="),
+            ("min_amount", "amount>="), ("max_amount", "amount<="),
+            ("text_contains", "contains"),
+        ):
+            if (value := getattr(self, name)) is not None:
+                parts.append(f"{label}{'=' if label[-1].isalpha() else ''}{value}")
+        if self.require_ri:
+            parts.append("require_ri")
+        if self.min_abstract_chars:
+            parts.append(f"min_abstract_chars={self.min_abstract_chars}")
+        if self.predicates:
+            parts.append(f"+{len(self.predicates)} custom predicate(s)")
+        return ", ".join(parts) or "no filters"
+
     # -- composition -------------------------------------------------------
 
     def where(self, *predicates: Predicate) -> RecordFilter:

@@ -144,10 +144,29 @@ class TopicResults:
         return iter(self.topics)
 
     def __getitem__(self, index):
+        # See Download.__getitem__: still an IndexError, but one that says
+        # what was asked for.
+        if not self.topics and isinstance(index, int):
+            raise IndexError(
+                f"no topics matched, so index {index} is out of range. "
+                f"Query: {self.query}. Note that only agencies with live "
+                f"solicitations have open topics."
+            )
         return self.topics[index]
 
     def __bool__(self) -> bool:
         return bool(self.topics)
+
+    @property
+    def first(self) -> Topic | None:
+        """The first topic, or ``None`` when nothing matched."""
+        return self.topics[0] if self.topics else None
+
+    @property
+    def query(self) -> str:
+        """One-line description of what was asked for."""
+        parts = [f"{k}={v}" for k, v in self.filters.items() if v]
+        return ", ".join(parts) or "no filters"
 
     def filter_by(
         self,
@@ -236,6 +255,8 @@ class TopicResults:
         return sorted(dated, key=lambda t: t.close_date or "")[:limit]
 
     def summary(self) -> str:
+        if not self.topics:
+            return f"No topics matched. Query: {self.query}"
         agencies = len({t.agency for t in self.topics})
         open_count = sum(1 for t in self.topics if t.is_open)
         return (

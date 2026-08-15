@@ -279,3 +279,18 @@ def test_public_api_exports_topics():
     for name in ("Topic", "TopicResults", "download_topics"):
         assert name in gs.__all__
         assert hasattr(gs, name)
+
+
+def test_empty_topics_report_clearly(client, monkeypatch):
+    drive(client, monkeypatch, lambda f: FakeResponse("<html>", "text/html"))
+    results = download_topics(agency="NASA", client=client)
+
+    assert not results
+    assert results.first is None
+    assert "No topics matched" in results.summary()
+    with pytest.raises(IndexError, match="no topics matched"):
+        results[0]
+
+
+def test_topic_results_first_returns_a_topic(results):
+    assert results.first is results[0]

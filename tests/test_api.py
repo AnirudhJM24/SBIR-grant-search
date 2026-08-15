@@ -360,3 +360,70 @@ def test_probe_survives_maintenance_envelope(monkeypatch):
         sbir_api.http, "get_json", lambda url, **kw: {"message": "Forbidden"}
     )
     assert sbir_api.SbirApiAdapter().probe() is False
+
+
+# -- empty results --------------------------------------------------------
+
+
+@pytest.fixture
+def empty(local_csv):
+    return gs.download(csv_path=local_csv, years=[2024], transport="csv",
+                       agency="EPA")
+
+
+def test_empty_download_is_falsy_and_empty(empty):
+    assert len(empty) == 0
+    assert not empty
+    assert list(empty) == []
+
+
+def test_empty_summary_says_so_and_shows_the_query(empty):
+    text = empty.summary()
+    assert "No awards matched" in text
+    assert "agency=EPA" in text
+    assert "years=2024" in text
+
+
+def test_first_is_none_rather_than_raising(empty):
+    assert empty.first is None
+
+
+def test_indexing_empty_still_raises_indexerror(empty):
+    """Returning None would hide a no-match until something else broke."""
+    with pytest.raises(IndexError) as exc:
+        empty[0]
+    message = str(exc.value)
+    assert "no records matched" in message
+    assert "agency=EPA" in message      # says what was asked for
+
+
+def test_first_returns_the_record_when_there_is_one(local_csv):
+    d = gs.download(csv_path=local_csv, years=[2024], transport="csv")
+    assert d.first is d[0]
+
+
+def test_query_describes_filters_and_transport(local_csv):
+    d = gs.download(csv_path=local_csv, years=[2023, 2024], transport="csv",
+                    agency="NASA", min_amount=1000)
+    assert "agency=NASA" in d.query
+    assert "amount>=1000" in d.query
+    assert "years=2023-2024" in d.query
+    assert "via csv" in d.query
+
+
+def test_describe_with_no_filters():
+    from sbirgrantsearch.filters import RecordFilter
+
+    assert RecordFilter().describe() == "no filters"
+
+
+def test_describe_lists_every_active_constraint():
+    from sbirgrantsearch.filters import RecordFilter
+
+    text = RecordFilter(
+        agencies={"NASA"}, states={"CA"}, programs={"STTR"},
+        min_amount=500_000, text_contains="laser", require_ri=True,
+    ).describe()
+    for expected in ("agency=NASA", "state=CA", "program=STTR",
+                     "amount>=500000", "contains=laser", "require_ri"):
+        assert expected in text

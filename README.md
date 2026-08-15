@@ -68,6 +68,21 @@ mode hardest to notice.
 `years` takes an int, a range, a list, or `"2015-2025"`. It defaults to
 2015–2025.
 
+**When nothing matches**, the result is empty rather than an error, and it
+says what was asked for:
+
+```python
+d = gs.download(agency="NASA", state="WY", years=2025)
+d.summary()   # "No awards matched. Query: agency=NASA, state=WY, years=2025, via search"
+bool(d)       # False
+d.first       # None
+d[0]          # IndexError, naming the filters that produced no rows
+```
+
+`d[0]` still raises — indexing an empty sequence is an `IndexError` in
+Python, and returning `None` there would hide a no-match until something
+downstream broke oddly. Use `d.first` when you have not checked yet.
+
 ### Working with results
 
 ```python
@@ -77,6 +92,9 @@ len(d), d.transport            # 552, "search"
 d[0].title                     # indexable and iterable
 d.filter_by(state="CA")        # narrow further, no refetch
 d.by_company()                 # {normalized name: [records]}, biggest first
+
+d.first                        # first record, or None if nothing matched
+d.query                        # "agency=DOE, years=2023, via search"
 
 d.to_jsonl("out.jsonl")        # archival format (keeps `raw`)
 d.to_csv("out.csv")            # flat common schema
@@ -263,7 +281,7 @@ reapplies the filter regardless, so ignoring the hint is always correct.
 ## Tests
 
 ```bash
-python -m pytest tests -q    # 216 tests, no network required
+python -m pytest tests -q    # 226 tests, no network required
 ```
 
 Parser tests encode the actual junk in federal exports (`"171,433"`,

@@ -131,10 +131,42 @@ class Download:
         return iter(self.records)
 
     def __getitem__(self, index):
+        # Still an IndexError, because that is what indexing an empty
+        # sequence means -- returning None here would hide the fact that a
+        # query matched nothing until something downstream broke oddly.
+        # Only the message improves: an empty result is usually a filter
+        # that is too narrow, so it says which filters were in play.
+        if not self.records and isinstance(index, int):
+            raise IndexError(
+                f"no records matched, so index {index} is out of range. "
+                f"Query: {self.query}. Check the filters, or widen the "
+                f"year range."
+            )
         return self.records[index]
 
     def __bool__(self) -> bool:
         return bool(self.records)
+
+    @property
+    def first(self) -> Record | None:
+        """The first record, or ``None`` when nothing matched.
+
+        The safe way to peek at a result you have not checked::
+
+            if (r := d.first):
+                print(r.title)
+        """
+        return self.records[0] if self.records else None
+
+    @property
+    def query(self) -> str:
+        """One-line description of what was asked for."""
+        years = (
+            f"years={min(self.years)}-{max(self.years)}"
+            if len(self.years) > 1 else
+            f"years={self.years[0]}" if self.years else "years=none"
+        )
+        return f"{self.filter.describe()}, {years}, via {self.transport}"
 
     def filter_by(self, **options: Any) -> Download:
         """Narrow an already-downloaded result without refetching."""
@@ -212,6 +244,8 @@ class Download:
         )
 
     def summary(self) -> str:
+        if not self.records:
+            return f"No awards matched. Query: {self.query}"
         total = sum(r.award_amount or 0 for r in self.records)
         companies = len({r.recipient_norm for r in self.records})
         span = f"{min(self.years)}-{max(self.years)}" if self.years else "-"
