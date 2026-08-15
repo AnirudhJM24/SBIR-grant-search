@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1
+
+### Changed
+
+- Rewrote `examples/demo.py` as a formatted tour: a funding-by-agency bar
+  chart, aligned tables, compact currency, and the call that produced each
+  block shown above it. Colour is used only when stdout is a terminal, so
+  piping the output gives clean text.
+- The demo's output is now embedded in the README, so the project shows
+  what it does before asking anyone to install it.
+- The demo forces UTF-8 on stdout. Windows consoles default to cp1252 and
+  cannot encode box-drawing characters, so it crashed there on the first
+  line.
+
 ## 0.2.0
 
 ### Added
