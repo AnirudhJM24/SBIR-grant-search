@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbirgrantsearch"
-version = "0.2.1"
+version = "0.2.2"
 description = "Download US government innovation-funding records into one common schema, filtered how you ask."
 readme = "README.md"
 requires-python = ">=3.10"

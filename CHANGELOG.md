@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2
+
+### Changed
+
+- Rewrote the README in a reference-documentation register. Filters are now
+  a table rather than a prose list, sections are ordered by what a reader
+  needs first, and the commentary that explained design decisions to a
+  reviewer has been removed or reduced to a factual note.
+- Removed all em dashes and en dashes from the README and from the demo
+  output embedded in it.
+
 ## 0.2.1
 
 ### Changed

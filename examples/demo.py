@@ -191,7 +191,7 @@ def main() -> None:
         [
             [
                 next((a.recipient for a in group), name)[:32],
-                next((a.uei for a in group if a.uei), "—"),
+                next((a.uei for a in group if a.uei), "-"),
                 len(group),
                 money(sum(a.award_amount or 0 for a in group)),
             ]
@@ -210,7 +210,7 @@ def main() -> None:
     table(
         ["company", "state", "research partner"],
         [
-            [r.recipient[:30], r.state or "—", (r.ri_name or "")[:30]]
+            [r.recipient[:30], r.state or "-", (r.ri_name or "")[:30]]
             for r in spinouts[:6]
         ],
         [30, 5, 30],
@@ -231,7 +231,7 @@ def main() -> None:
 
     # -- 7. topics ---------------------------------------------------------
     section(7, "What agencies want funded next",
-            "Open solicitations — the forward-looking half of the picture.")
+            "Open solicitations: the forward-looking half of the picture.")
     code('gs.download_topics(status="open")')
     topics = gs.download_topics()
     print(f"\n  {topics.summary()}\n")
